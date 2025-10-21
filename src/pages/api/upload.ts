@@ -1,4 +1,4 @@
-import formidable from 'formidable'
+import formidable, { File } from 'formidable'
 import fs from 'fs'
 import { supabase } from '../../../src/lib/supabaseClient'
 import { extractTextFromPdf } from '../../../src/lib/serverUtils'
@@ -15,18 +15,18 @@ const uploadHandler = async (req: any, res: any) => {
   const form = new formidable.IncomingForm()
   form.parse(req, async (err, fields, files) => {
     if (err) return res.status(500).json({ error: String(err) })
-    // @ts-ignore
-    const file = files.file
+
+    const file = files.file as File // Explicitly cast to File
     if (!file) return res.status(400).json({ error: 'No file uploaded' })
 
     try {
-      const buffer = fs.readFileSync(file.filepath || file.path)
+      const buffer = fs.readFileSync(file.filepath)
 
       const text = await extractTextFromPdf(buffer)
 
       // Store the file in Supabase storage (server-side requires service role key in headers)
       const bucket = process.env.SUPABASE_BUCKET || 'documents'
-      const filename = `${Date.now()}_${file.originalFilename || file.name}`
+      const filename = `${Date.now()}_${file.originalFilename || 'document'}`
 
       const { data: uploadData, error: uploadError } = await supabase.storage.from(bucket).upload(filename, buffer, { upsert: false })
       if (uploadError) console.warn('Storage upload error', uploadError.message)
